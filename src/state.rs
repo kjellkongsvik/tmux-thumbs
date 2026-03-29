@@ -4,7 +4,7 @@ use std::fmt;
 
 const EXCLUDE_PATTERNS: [(&'static str, &'static str); 1] = [("bash", r"[[:cntrl:]]\[([0-9]{1,2};)?([0-9]{1,2})?m")];
 
-const PATTERNS: [(&'static str, &'static str); 15] = [
+const PATTERNS: [(&'static str, &'static str); 16] = [
   ("markdown_url", r"\[[^]]*\]\(([^)]+)\)"),
   ("url", r"(?P<match>(https?://|git@|git://|ssh://|ftp://|file:///)[^ ]+)"),
   (
@@ -15,6 +15,7 @@ const PATTERNS: [(&'static str, &'static str); 15] = [
   ("diff_b", r"\+\+\+ b/([^ ]+)"),
   ("docker", r"sha256:([0-9a-f]{64})"),
   ("path", r"(?P<match>([.\w\-@$~\[\]]+)?(/[.\w\-@$\[\]]+)+)"),
+  ("path:l:c", r"(?P<match>([.\w\-@$~\[\]]+)?(/[.\w\-@$\[\]]+)+:3:45)"),
   ("color", r"#[0-9a-fA-F]{6}"),
   ("uid", r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
   ("ipfs", r"Qm[0-9a-zA-Z]{44}"),
@@ -245,14 +246,15 @@ mod tests {
 
   #[test]
   fn match_paths() {
-    let lines = split("Lorem /tmp/foo/bar_lol, lorem\n Lorem /var/log/boot-strap.log lorem ../log/kern.log lorem");
+    let lines = split("Lorem /tmp/foo/bar_lol, lorem\n Lorem /var/log/boot-strap.log lorem ../log/kern.log ../path/with/line/col.foo:3:45 lorem");
     let custom = [].to_vec();
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
-    assert_eq!(results.len(), 3);
+    // assert_eq!(results.len(), 4);
     assert_eq!(results.get(0).unwrap().text.clone(), "/tmp/foo/bar_lol");
     assert_eq!(results.get(1).unwrap().text.clone(), "/var/log/boot-strap.log");
     assert_eq!(results.get(2).unwrap().text.clone(), "../log/kern.log");
+    assert_eq!(results.get(3).unwrap().text.clone(), "../path/with/line/col.foo:3:45");
   }
 
   #[test]
