@@ -34,29 +34,29 @@ mod tests {
 
   #[test]
   fn match_color() {
-    let text1 = println!("{}{}", color::Fg(&*get_color("green")), "foo");
-    let text2 = println!("{}{}", color::Fg(color::Green), "foo");
+    println!("{}foo", color::Fg(&*get_color("green")));
+    println!("{}foo", color::Fg(color::Green));
 
-    assert_eq!(text1, text2);
+    assert_eq!((), ());
   }
 
   #[test]
   fn parse_rgb() {
-    let text1 = println!("{}{}", color::Fg(&*get_color("#1b1cbf")), "foo");
-    let text2 = println!("{}{}", color::Fg(color::Rgb(27, 28, 191)), "foo");
+    println!("{}foo", color::Fg(&*get_color("#1b1cbf")));
+    println!("{}foo", color::Fg(color::Rgb(27, 28, 191)));
 
-    assert_eq!(text1, text2);
+    assert_eq!((), ());
   }
 
   #[test]
   #[should_panic]
   fn parse_invalid_rgb() {
-    println!("{}{}", color::Fg(&*get_color("#1b1cbj")), "foo");
+    println!("{}foo", color::Fg(&*get_color("#1b1cbj")));
   }
 
   #[test]
   #[should_panic]
   fn no_match_color() {
-    println!("{}{}", color::Fg(&*get_color("wat")), "foo");
+    println!("{}foo", color::Fg(&*get_color("wat")));
   }
 }

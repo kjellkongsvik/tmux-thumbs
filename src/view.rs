@@ -34,6 +34,7 @@ enum CaptureEvent {
 }
 
 impl<'a> View<'a> {
+  #[allow(clippy::too_many_arguments)]
   pub fn new(
     state: &'a mut state::State<'a>,
     multi: bool,
@@ -92,7 +93,7 @@ impl<'a> View<'a> {
     }
   }
 
-  fn render(&self, stdout: &mut dyn Write, typed_hint: &str) -> () {
+  fn render(&self, stdout: &mut dyn Write, typed_hint: &str) {
     let (columns, rows) = terminal_size().unwrap();
     write!(stdout, "{}", cursor::Hide).unwrap();
     let mut line_row: u16 = 0;
@@ -110,7 +111,7 @@ impl<'a> View<'a> {
 
     let mut line_start = 0;
     for (index, line) in self.state.lines.iter().enumerate() {
-      if line_row - 1 - line_rows[index] > rows as u16 {
+      if line_row - 1 - line_rows[index] > rows {
         line_start = line_rows[index + 1];
         continue;
       }
@@ -347,7 +348,7 @@ mod tests {
       skip: 0,
       multi: false,
       contrast: false,
-      position: &"",
+      position: "",
       matches: vec![],
       select_foreground_color: colors::get_color("default"),
       select_background_color: colors::get_color("default"),

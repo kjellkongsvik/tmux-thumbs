@@ -218,7 +218,7 @@ fn main() {
         .open(target)
         .expect("Unable to open the target file");
 
-      file.write(output.as_bytes()).unwrap();
+      file.write_all(output.as_bytes()).unwrap();
     } else {
       print!("{}", output);
     }
