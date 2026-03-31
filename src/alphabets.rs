@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-const ALPHABETS: [(&'static str, &'static str); 22] = [
+const ALPHABETS: [(&str, &str); 22] = [
   ("numeric", "1234567890"),
   ("abcd", "abcd"),
   ("qwerty", "asdfqwerzxcvjklmiuopghtybn"),
@@ -30,7 +28,7 @@ pub struct Alphabet<'a> {
 }
 
 impl<'a> Alphabet<'a> {
-  fn new(letters: &'a str) -> Alphabet {
+  const fn new(letters: &'a str) -> Self {
     Alphabet { letters }
   }
 
@@ -64,14 +62,14 @@ impl<'a> Alphabet<'a> {
   }
 }
 
-pub fn get_alphabet(alphabet_name: &str) -> Alphabet {
-  let alphabets: HashMap<&str, &str> = ALPHABETS.iter().cloned().collect();
+pub fn get_alphabet(alphabet_name: &str) -> Alphabet<'_> {
+  let letters = ALPHABETS
+    .iter()
+    .find(|(name, _)| *name == alphabet_name)
+    .unwrap_or_else(|| panic!("Unknown alphabet: {alphabet_name}"))
+    .1;
 
-  alphabets
-    .get(alphabet_name)
-    .expect(format!("Unknown alphabet: {}", alphabet_name).as_str()); // FIXME
-
-  Alphabet::new(alphabets[alphabet_name])
+  Alphabet::new(letters)
 }
 
 #[cfg(test)]
