@@ -1,11 +1,12 @@
 use super::*;
 use std::char;
-use std::io::{stdout, Read, Write};
-use termion::async_stdin;
+use std::fs::File;
+use std::io::{Read, Write};
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-use termion::screen::AlternateScreen;
+use termion::screen::IntoAlternateScreen;
+use termion::{async_stdin, get_tty};
 use termion::{color, cursor, terminal_size};
 
 use unicode_width::UnicodeWidthStr;
@@ -26,6 +27,7 @@ pub struct View<'a> {
   hint_background_color: Box<dyn color::Color>,
   hint_foreground_color: Box<dyn color::Color>,
   chosen: Vec<(String, bool)>,
+  tty: Option<File>,
 }
 
 enum CaptureEvent {
@@ -69,6 +71,7 @@ impl<'a> View<'a> {
       hint_foreground_color,
       hint_background_color,
       chosen: vec![],
+      tty: None,
     }
   }
 
@@ -117,7 +120,11 @@ impl<'a> View<'a> {
       let clean = line.trim_end_matches(|c: char| c.is_whitespace());
 
       if !clean.is_empty() {
-        print!("{goto}{text}", goto = cursor::Goto(1, line_rows[index] - line_start + 1), text = line);
+        print!(
+          "{goto}{text}",
+          goto = cursor::Goto(1, line_rows[index] - line_start + 1),
+          text = line
+        );
       }
     }
 
@@ -315,15 +322,26 @@ impl<'a> View<'a> {
   }
 
   pub fn present(&mut self) -> Vec<(String, bool)> {
+    let tty = match get_tty() {
+      Ok(t) => t,
+      Err(_) => return vec![],
+    };
+    self.tty = Some(tty);
     let mut stdin = async_stdin();
-    let mut stdout = AlternateScreen::from(stdout().into_raw_mode().unwrap());
+    let mut stdout = match get_tty()
+      .and_then(|t| t.into_raw_mode())
+      .and_then(|t| t.into_alternate_screen())
+    {
+      Ok(t) => t,
+      Err(_) => return vec![],
+    };
 
     let hints = match self.listen(&mut stdin, &mut stdout) {
       CaptureEvent::Exit => vec![],
       CaptureEvent::Hint => self.chosen.clone(),
     };
 
-    write!(stdout, "{}", cursor::Show).unwrap();
+    let _ = write!(stdout, "{}", cursor::Show);
 
     hints
   }
@@ -358,6 +376,7 @@ mod tests {
       hint_background_color: colors::get_color("default"),
       hint_foreground_color: colors::get_color("default"),
       chosen: vec![],
+      tty: None,
     };
 
     let result = view.make_hint_text("a");

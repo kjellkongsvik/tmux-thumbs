@@ -12,7 +12,7 @@ If you want to enjoy terminal hints, you can do things like this without `tmux`:
 
 ```
 > git log | thumbs
-> zellij ac dump-screen | thumbs
+> zellij ac dump-screen | thumbs | wl-copy
 ```
 
 ### Matched patterns
