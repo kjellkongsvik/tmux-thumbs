@@ -12,7 +12,7 @@ license = "MIT"
 termion = "1.5.6"
 regex = "1.7.1"
 clap = "2.34.0"
-unicode-width = "0.1.10"
+unicode-width = "^0.2"
 lazy_static = "1.4.0"
 
 [[bin]]
