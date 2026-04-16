@@ -1,5 +1,17 @@
 use termion::color;
 
+#[derive(Clone, Copy)]
+pub struct Colors {
+  pub foreground: color::Rgb,
+  pub background: color::Rgb,
+  pub hint_foreground: color::Rgb,
+  pub hint_background: color::Rgb,
+  pub select_foreground: color::Rgb,
+  pub select_background: color::Rgb,
+  pub multi_foreground: color::Rgb,
+  pub multi_background: color::Rgb,
+}
+
 pub fn parse_color(color_name: &str) -> color::Rgb {
   match color_name {
     "black" | "default" => color::Rgb(0, 0, 0),

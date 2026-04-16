@@ -138,14 +138,16 @@ fn main() {
     .get_many::<String>("regexp")
     .map_or_else(Vec::new, |items| items.map(String::as_str).collect());
 
-  let foreground_color = colors::parse_color(args.get_one::<String>("foreground_color").unwrap());
-  let background_color = colors::parse_color(args.get_one::<String>("background_color").unwrap());
-  let hint_foreground_color = colors::parse_color(args.get_one::<String>("hint_foreground_color").unwrap());
-  let hint_background_color = colors::parse_color(args.get_one::<String>("hint_background_color").unwrap());
-  let select_foreground_color = colors::parse_color(args.get_one::<String>("select_foreground_color").unwrap());
-  let select_background_color = colors::parse_color(args.get_one::<String>("select_background_color").unwrap());
-  let multi_foreground_color = colors::parse_color(args.get_one::<String>("multi_foreground_color").unwrap());
-  let multi_background_color = colors::parse_color(args.get_one::<String>("multi_background_color").unwrap());
+  let colors = colors::Colors {
+    foreground: colors::parse_color(args.get_one::<String>("foreground_color").unwrap()),
+    background: colors::parse_color(args.get_one::<String>("background_color").unwrap()),
+    hint_foreground: colors::parse_color(args.get_one::<String>("hint_foreground_color").unwrap()),
+    hint_background: colors::parse_color(args.get_one::<String>("hint_background_color").unwrap()),
+    select_foreground: colors::parse_color(args.get_one::<String>("select_foreground_color").unwrap()),
+    select_background: colors::parse_color(args.get_one::<String>("select_background_color").unwrap()),
+    multi_foreground: colors::parse_color(args.get_one::<String>("multi_foreground_color").unwrap()),
+    multi_background: colors::parse_color(args.get_one::<String>("multi_background_color").unwrap()),
+  };
 
   let stdin = io::stdin();
   let mut handle = stdin.lock();
@@ -165,14 +167,7 @@ fn main() {
       unique,
       contrast,
       position,
-      select_foreground_color,
-      select_background_color,
-      multi_foreground_color,
-      multi_background_color,
-      foreground_color,
-      background_color,
-      hint_foreground_color,
-      hint_background_color,
+      colors,
     );
 
     viewbox.present()
