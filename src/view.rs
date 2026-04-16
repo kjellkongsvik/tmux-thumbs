@@ -10,6 +10,15 @@ use termion::{color, cursor, get_tty, terminal_size_fd};
 
 use unicode_width::UnicodeWidthStr;
 
+pub struct ViewOptions<'a> {
+  pub multi: bool,
+  pub reverse: bool,
+  pub unique: bool,
+  pub contrast: bool,
+  pub position: &'a str,
+  pub colors: Colors,
+}
+
 pub struct View<'a> {
   state: &'a mut state::State<'a>,
   skip: usize,
@@ -27,26 +36,18 @@ enum CaptureEvent {
 }
 
 impl<'a> View<'a> {
-  pub fn new(
-    state: &'a mut state::State<'a>,
-    multi: bool,
-    reverse: bool,
-    unique: bool,
-    contrast: bool,
-    position: &'a str,
-    colors: Colors,
-  ) -> View<'a> {
-    let matches = state.matches(reverse, unique);
-    let skip = if reverse { matches.len() - 1 } else { 0 };
+  pub fn new(state: &'a mut state::State<'a>, opts: ViewOptions<'a>) -> View<'a> {
+    let matches = state.matches(opts.reverse, opts.unique);
+    let skip = if opts.reverse { matches.len() - 1 } else { 0 };
 
     View {
       state,
       skip,
-      multi,
-      contrast,
-      position,
+      multi: opts.multi,
+      contrast: opts.contrast,
+      position: opts.position,
       matches,
-      colors,
+      colors: opts.colors,
       chosen: vec![],
     }
   }

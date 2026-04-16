@@ -162,12 +162,14 @@ fn main() {
   let selected = {
     let mut viewbox = view::View::new(
       &mut state,
-      multi,
-      reverse,
-      unique,
-      contrast,
-      position,
-      colors,
+      view::ViewOptions {
+        multi,
+        reverse,
+        unique,
+        contrast,
+        position,
+        colors,
+      },
     );
 
     viewbox.present()
