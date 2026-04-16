@@ -1,8 +1,3 @@
-#[macro_use]
-extern crate lazy_static;
-extern crate clap;
-extern crate termion;
-
 mod alphabets;
 mod colors;
 mod state;
@@ -11,16 +6,6 @@ mod view;
 use clap::{Arg, ArgAction, Command};
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
-
-#[allow(dead_code)]
-fn dbg(msg: &str) {
-  let mut file = std::fs::OpenOptions::new()
-    .append(true)
-    .open("/tmp/thumbs.log")
-    .expect("Unable to open log file");
-
-  writeln!(&mut file, "{}", msg).expect("Unable to write log file");
-}
 
 fn app_args() -> clap::ArgMatches {
   Command::new("thumbs")
@@ -153,14 +138,14 @@ fn main() {
     .get_many::<String>("regexp")
     .map_or_else(Vec::new, |items| items.map(String::as_str).collect());
 
-  let foreground_color = colors::get_color(args.get_one::<String>("foreground_color").unwrap());
-  let background_color = colors::get_color(args.get_one::<String>("background_color").unwrap());
-  let hint_foreground_color = colors::get_color(args.get_one::<String>("hint_foreground_color").unwrap());
-  let hint_background_color = colors::get_color(args.get_one::<String>("hint_background_color").unwrap());
-  let select_foreground_color = colors::get_color(args.get_one::<String>("select_foreground_color").unwrap());
-  let select_background_color = colors::get_color(args.get_one::<String>("select_background_color").unwrap());
-  let multi_foreground_color = colors::get_color(args.get_one::<String>("multi_foreground_color").unwrap());
-  let multi_background_color = colors::get_color(args.get_one::<String>("multi_background_color").unwrap());
+  let foreground_color = colors::parse_color(args.get_one::<String>("foreground_color").unwrap());
+  let background_color = colors::parse_color(args.get_one::<String>("background_color").unwrap());
+  let hint_foreground_color = colors::parse_color(args.get_one::<String>("hint_foreground_color").unwrap());
+  let hint_background_color = colors::parse_color(args.get_one::<String>("hint_background_color").unwrap());
+  let select_foreground_color = colors::parse_color(args.get_one::<String>("select_foreground_color").unwrap());
+  let select_background_color = colors::parse_color(args.get_one::<String>("select_background_color").unwrap());
+  let multi_foreground_color = colors::parse_color(args.get_one::<String>("multi_foreground_color").unwrap());
+  let multi_background_color = colors::parse_color(args.get_one::<String>("multi_background_color").unwrap());
 
   let stdin = io::stdin();
   let mut handle = stdin.lock();

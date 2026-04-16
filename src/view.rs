@@ -1,12 +1,11 @@
-use super::*;
-use std::char;
-use std::io::{stdout, Read, Write};
+use super::state;
+use std::io::{Read, Write};
 use termion::async_stdin;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-use termion::screen::AlternateScreen;
-use termion::{color, cursor, terminal_size};
+use termion::screen::IntoAlternateScreen;
+use termion::{color, cursor, get_tty, terminal_size_fd};
 
 use unicode_width::UnicodeWidthStr;
 
@@ -17,14 +16,14 @@ pub struct View<'a> {
   contrast: bool,
   position: &'a str,
   matches: Vec<state::Match<'a>>,
-  select_foreground_color: Box<dyn color::Color>,
-  select_background_color: Box<dyn color::Color>,
-  multi_foreground_color: Box<dyn color::Color>,
-  multi_background_color: Box<dyn color::Color>,
-  foreground_color: Box<dyn color::Color>,
-  background_color: Box<dyn color::Color>,
-  hint_background_color: Box<dyn color::Color>,
-  hint_foreground_color: Box<dyn color::Color>,
+  select_foreground_color: color::Rgb,
+  select_background_color: color::Rgb,
+  multi_foreground_color: color::Rgb,
+  multi_background_color: color::Rgb,
+  foreground_color: color::Rgb,
+  background_color: color::Rgb,
+  hint_background_color: color::Rgb,
+  hint_foreground_color: color::Rgb,
   chosen: Vec<(String, bool)>,
 }
 
@@ -41,14 +40,14 @@ impl<'a> View<'a> {
     unique: bool,
     contrast: bool,
     position: &'a str,
-    select_foreground_color: Box<dyn color::Color>,
-    select_background_color: Box<dyn color::Color>,
-    multi_foreground_color: Box<dyn color::Color>,
-    multi_background_color: Box<dyn color::Color>,
-    foreground_color: Box<dyn color::Color>,
-    background_color: Box<dyn color::Color>,
-    hint_foreground_color: Box<dyn color::Color>,
-    hint_background_color: Box<dyn color::Color>,
+    select_foreground_color: color::Rgb,
+    select_background_color: color::Rgb,
+    multi_foreground_color: color::Rgb,
+    multi_background_color: color::Rgb,
+    foreground_color: color::Rgb,
+    background_color: color::Rgb,
+    hint_foreground_color: color::Rgb,
+    hint_background_color: color::Rgb,
   ) -> View<'a> {
     let matches = state.matches(reverse, unique);
     let skip = if reverse { matches.len() - 1 } else { 0 };
@@ -86,14 +85,14 @@ impl<'a> View<'a> {
 
   fn make_hint_text(&self, hint: &str) -> String {
     if self.contrast {
-      format!("[{}]", hint)
+      format!("[{hint}]")
     } else {
       hint.to_string()
     }
   }
 
-  fn render(&self, stdout: &mut dyn Write, typed_hint: &str) -> () {
-    let (columns, rows) = terminal_size().unwrap();
+  fn render(&self, stdout: &mut dyn Write, typed_hint: &str) {
+    let (columns, rows) = terminal_size_fd(&get_tty().unwrap()).unwrap();
     write!(stdout, "{}", cursor::Hide).unwrap();
     let mut line_row: u16 = 0;
     let mut line_rows = Vec::new();
@@ -117,7 +116,7 @@ impl<'a> View<'a> {
       let clean = line.trim_end_matches(|c: char| c.is_whitespace());
 
       if !clean.is_empty() {
-        print!("{goto}{text}", goto = cursor::Goto(1, line_rows[index] - line_start + 1), text = line);
+        write!(stdout, "{goto}{text}", goto = cursor::Goto(1, line_rows[index] - line_start + 1), text = line).unwrap();
       }
     }
 
@@ -130,18 +129,18 @@ impl<'a> View<'a> {
       let chosen_hint = self.chosen.iter().any(|(hint, _)| hint == mat.text);
 
       let selected_color = if chosen_hint {
-        &self.multi_foreground_color
+        self.multi_foreground_color
       } else if selected == Some(mat) {
-        &self.select_foreground_color
+        self.select_foreground_color
       } else {
-        &self.foreground_color
+        self.foreground_color
       };
       let selected_background_color = if chosen_hint {
-        &self.multi_background_color
+        self.multi_background_color
       } else if selected == Some(mat) {
-        &self.select_background_color
+        self.select_background_color
       } else {
-        &self.background_color
+        self.background_color
       };
 
       // Find long utf sequences and extract it from mat.x
@@ -151,15 +150,16 @@ impl<'a> View<'a> {
       let offset = (mat.x as u16) - (extra as u16);
       let text = self.make_hint_text(mat.text);
 
-      print!(
+      write!(
+        stdout,
         "{goto}{background}{foregroud}{text}{resetf}{resetb}",
         goto = cursor::Goto(offset + 1, line_rows[mat.y as usize] - line_start + 1),
-        foregroud = color::Fg(&**selected_color),
-        background = color::Bg(&**selected_background_color),
+        foregroud = color::Fg(selected_color),
+        background = color::Bg(selected_background_color),
         resetf = color::Fg(color::Reset),
         resetb = color::Bg(color::Reset),
         text = &text
-      );
+      ).unwrap();
 
       if let Some(ref hint) = mat.hint {
         let extra_position = match self.position {
@@ -172,26 +172,28 @@ impl<'a> View<'a> {
         let text = self.make_hint_text(hint.as_str());
         let final_position = std::cmp::max(offset as i16 + extra_position as i16, 0);
 
-        print!(
+        write!(
+          stdout,
           "{goto}{background}{foregroud}{text}{resetf}{resetb}",
           goto = cursor::Goto(final_position as u16 + 1, line_rows[mat.y as usize] - line_start + 1),
-          foregroud = color::Fg(&*self.hint_foreground_color),
-          background = color::Bg(&*self.hint_background_color),
+          foregroud = color::Fg(self.hint_foreground_color),
+          background = color::Bg(self.hint_background_color),
           resetf = color::Fg(color::Reset),
           resetb = color::Bg(color::Reset),
           text = &text
-        );
+        ).unwrap();
 
         if hint.starts_with(typed_hint) {
-          print!(
+          write!(
+            stdout,
             "{goto}{background}{foregroud}{text}{resetf}{resetb}",
             goto = cursor::Goto(final_position as u16 + 1, line_rows[mat.y as usize] - line_start + 1),
-            foregroud = color::Fg(&*self.multi_foreground_color),
-            background = color::Bg(&*self.multi_background_color),
+            foregroud = color::Fg(self.multi_foreground_color),
+            background = color::Bg(self.multi_background_color),
             resetf = color::Fg(color::Reset),
             resetb = color::Bg(color::Reset),
             text = &typed_hint
-          );
+          ).unwrap();
         }
       }
     }
@@ -316,7 +318,7 @@ impl<'a> View<'a> {
 
   pub fn present(&mut self) -> Vec<(String, bool)> {
     let mut stdin = async_stdin();
-    let mut stdout = AlternateScreen::from(stdout().into_raw_mode().unwrap());
+    let mut stdout = get_tty().unwrap().into_raw_mode().unwrap().into_alternate_screen().unwrap();
 
     let hints = match self.listen(&mut stdin, &mut stdout) {
       CaptureEvent::Exit => vec![],
@@ -332,6 +334,7 @@ impl<'a> View<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::colors;
 
   fn split(output: &str) -> Vec<&str> {
     output.split("\n").collect::<Vec<&str>>()
@@ -342,21 +345,22 @@ mod tests {
     let lines = split("lorem 127.0.0.1 lorem");
     let custom = [].to_vec();
     let mut state = state::State::new(&lines, "abcd", &custom);
+    let default = colors::parse_color("default");
     let mut view = View {
       state: &mut state,
       skip: 0,
       multi: false,
       contrast: false,
-      position: &"",
+      position: "",
       matches: vec![],
-      select_foreground_color: colors::get_color("default"),
-      select_background_color: colors::get_color("default"),
-      multi_foreground_color: colors::get_color("default"),
-      multi_background_color: colors::get_color("default"),
-      foreground_color: colors::get_color("default"),
-      background_color: colors::get_color("default"),
-      hint_background_color: colors::get_color("default"),
-      hint_foreground_color: colors::get_color("default"),
+      select_foreground_color: default,
+      select_background_color: default,
+      multi_foreground_color: default,
+      multi_background_color: default,
+      foreground_color: default,
+      background_color: default,
+      hint_background_color: default,
+      hint_foreground_color: default,
       chosen: vec![],
     };
 
