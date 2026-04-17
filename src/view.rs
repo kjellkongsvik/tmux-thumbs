@@ -36,7 +36,7 @@ enum CaptureEvent {
 }
 
 impl<'a> View<'a> {
-  pub fn new(state: &'a mut state::State<'a>, opts: ViewOptions<'a>) -> View<'a> {
+  pub fn new(state: &'a mut state::State<'a>, opts: ViewOptions<'a>) -> Self {
     let matches = state.matches(opts.reverse, opts.unique);
     let skip = if opts.reverse { matches.len() - 1 } else { 0 };
 
@@ -78,7 +78,7 @@ impl<'a> View<'a> {
     let mut line_row: u16 = 0;
     let mut line_rows = Vec::new();
 
-    for line in self.state.lines.iter() {
+    for line in self.state.lines {
       let clean = line.trim_end_matches(|c: char| c.is_whitespace());
 
       line_rows.push(line_row);
@@ -90,7 +90,7 @@ impl<'a> View<'a> {
 
     let mut line_start = 0;
     for (index, line) in self.state.lines.iter().enumerate() {
-      if line_row - 1 - line_rows[index] > rows as u16 {
+      if line_row - 1 - line_rows[index] > rows {
         line_start = line_rows[index + 1];
         continue;
       }
@@ -103,10 +103,10 @@ impl<'a> View<'a> {
 
     let selected = self.matches.get(self.skip);
 
-    for mat in self.matches.iter() {
-      if line_rows[mat.y as usize] < line_start {
+    for mat in &self.matches {
+      if line_rows[mat.y] < line_start {
         continue;
-      };
+      }
       let chosen_hint = self.chosen.iter().any(|(hint, _)| hint == mat.text);
 
       let selected_color = if chosen_hint {
@@ -125,8 +125,8 @@ impl<'a> View<'a> {
       };
 
       // Find long utf sequences and extract it from mat.x
-      let line = &self.state.lines[mat.y as usize];
-      let prefix = &line[0..mat.x as usize];
+      let line = &self.state.lines[mat.y];
+      let prefix = &line[0..mat.x];
       let extra = prefix.width_cjk() - prefix.chars().count();
       let offset = (mat.x as u16) - (extra as u16);
       let text = self.make_hint_text(mat.text);
@@ -134,13 +134,14 @@ impl<'a> View<'a> {
       write!(
         stdout,
         "{goto}{background}{foregroud}{text}{resetf}{resetb}",
-        goto = cursor::Goto(offset + 1, line_rows[mat.y as usize] - line_start + 1),
+        goto = cursor::Goto(offset + 1, line_rows[mat.y] - line_start + 1),
         foregroud = color::Fg(selected_color),
         background = color::Bg(selected_background_color),
         resetf = color::Fg(color::Reset),
         resetb = color::Bg(color::Reset),
         text = &text
-      ).unwrap();
+      )
+      .unwrap();
 
       if let Some(ref hint) = mat.hint {
         let extra_position = match self.position {
@@ -156,25 +157,27 @@ impl<'a> View<'a> {
         write!(
           stdout,
           "{goto}{background}{foregroud}{text}{resetf}{resetb}",
-          goto = cursor::Goto(final_position as u16 + 1, line_rows[mat.y as usize] - line_start + 1),
+          goto = cursor::Goto(final_position as u16 + 1, line_rows[mat.y] - line_start + 1),
           foregroud = color::Fg(self.colors.hint_foreground),
           background = color::Bg(self.colors.hint_background),
           resetf = color::Fg(color::Reset),
           resetb = color::Bg(color::Reset),
           text = &text
-        ).unwrap();
+        )
+        .unwrap();
 
         if hint.starts_with(typed_hint) {
           write!(
             stdout,
             "{goto}{background}{foregroud}{text}{resetf}{resetb}",
-            goto = cursor::Goto(final_position as u16 + 1, line_rows[mat.y as usize] - line_start + 1),
+            goto = cursor::Goto(final_position as u16 + 1, line_rows[mat.y] - line_start + 1),
             foregroud = color::Fg(self.colors.multi_foreground),
             background = color::Bg(self.colors.multi_background),
             resetf = color::Fg(color::Reset),
             resetb = color::Bg(color::Reset),
             text = &typed_hint
-          ).unwrap();
+          )
+          .unwrap();
         }
       }
     }
@@ -187,20 +190,18 @@ impl<'a> View<'a> {
       return CaptureEvent::Exit;
     }
 
-    let mut typed_hint: String = "".to_owned();
+    let mut typed_hint = String::new();
     let longest_hint = self
       .matches
       .iter()
       .filter_map(|m| m.hint.clone())
       .max_by(|x, y| x.len().cmp(&y.len()))
-      .unwrap()
-      .clone();
+      .unwrap();
 
     self.render(stdout, &typed_hint);
 
     loop {
-      match stdin.keys().next() {
-        Some(key) => {
+      if let Some(key) = stdin.keys().next() {
           match key {
             Ok(key) => {
               match key {
@@ -211,16 +212,10 @@ impl<'a> View<'a> {
                     break;
                   }
                 }
-                Key::Up => {
+                Key::Up | Key::Left => {
                   self.prev();
                 }
-                Key::Down => {
-                  self.next();
-                }
-                Key::Left => {
-                  self.prev();
-                }
-                Key::Right => {
+                Key::Down | Key::Right => {
                   self.next();
                 }
                 Key::Backspace => {
@@ -242,10 +237,9 @@ impl<'a> View<'a> {
                       if self.multi {
                         // Finalize the multi selection
                         return CaptureEvent::Hint;
-                      } else {
-                        // Enable the multi selection
-                        self.multi = true;
                       }
+                      // Enable the multi selection
+                      self.multi = true;
                     }
                     key => {
                       let key = key.to_string();
@@ -253,7 +247,7 @@ impl<'a> View<'a> {
 
                       typed_hint.push_str(lower_key.as_str());
 
-                      let selection = self.matches.iter().find(|mat| mat.hint == Some(typed_hint.clone()));
+                      let selection = self.matches.iter().find(|mat| mat.hint.as_deref() == Some(typed_hint.as_str()));
 
                       match selection {
                         Some(mat) => {
@@ -282,13 +276,11 @@ impl<'a> View<'a> {
             Err(err) => panic!("{}", err),
           }
 
-          stdin.keys().for_each(|_| { /* Skip the rest of stdin buffer */ })
-        }
-        _ => {
+          stdin.keys().for_each(|_| { /* Skip the rest of stdin buffer */ });
+      } else {
           // Nothing in the buffer. Wait for a bit...
           std::thread::sleep(std::time::Duration::from_millis(50));
           continue; // don't render again if nothing new to show
-        }
       }
 
       self.render(stdout, &typed_hint);
@@ -299,7 +291,10 @@ impl<'a> View<'a> {
 
   pub fn present(&mut self) -> Vec<(String, bool)> {
     let mut stdin = async_stdin();
-    let mut stdout = get_tty().unwrap().into_raw_mode().unwrap().into_alternate_screen().unwrap();
+    let mut stdout = match get_tty().and_then(|t| t.into_raw_mode()).and_then(|t| t.into_alternate_screen()) {
+      Ok(t) => t,
+      Err(_) => return vec![],
+    };
 
     let hints = match self.listen(&mut stdin, &mut stdout) {
       CaptureEvent::Exit => vec![],

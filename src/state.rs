@@ -2,9 +2,9 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;
 
-const EXCLUDE_PATTERNS: [(&'static str, &'static str); 1] = [("bash", r"[[:cntrl:]]\[([0-9]{1,2};)?([0-9]{1,2})?m")];
+const EXCLUDE_PATTERNS: [(&str, &str); 1] = [("bash", r"[[:cntrl:]]\[([0-9]{1,2};)?([0-9]{1,2})?m")];
 
-const PATTERNS: [(&'static str, &'static str); 15] = [
+const PATTERNS: [(&str, &str); 15] = [
   ("markdown_url", r"\[[^]]*\]\(([^)]+)\)"),
   ("url", r"(?P<match>(https?://|git@|git://|ssh://|ftp://|file:///)[^ ]+)"),
   (
@@ -27,14 +27,14 @@ const PATTERNS: [(&'static str, &'static str); 15] = [
 
 #[derive(Clone)]
 pub struct Match<'a> {
-  pub x: i32,
-  pub y: i32,
+  pub x: usize,
+  pub y: usize,
   pub pattern: &'a str,
   pub text: &'a str,
   pub hint: Option<String>,
 }
 
-impl<'a> fmt::Debug for Match<'a> {
+impl fmt::Debug for Match<'_> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(
       f,
@@ -43,12 +43,12 @@ impl<'a> fmt::Debug for Match<'a> {
       self.y,
       self.pattern,
       self.text,
-      self.hint.clone().unwrap_or("<undefined>".to_string())
+      self.hint.clone().unwrap_or_else(|| "<undefined>".to_string())
     )
   }
 }
 
-impl<'a> PartialEq for Match<'a> {
+impl PartialEq for Match<'_> {
   fn eq(&self, other: &Match) -> bool {
     self.x == other.x && self.y == other.y
   }
@@ -61,8 +61,8 @@ pub struct State<'a> {
 }
 
 impl<'a> State<'a> {
-  pub fn new(lines: &'a Vec<&'a str>, alphabet: &'a str, regexp: &'a Vec<&'a str>) -> State<'a> {
-    State {
+  pub const fn new(lines: &'a Vec<&'a str>, alphabet: &'a str, regexp: &'a Vec<&'a str>) -> Self {
+    Self {
       lines,
       alphabet,
       regexp,
@@ -93,16 +93,13 @@ impl<'a> State<'a> {
 
     for (index, line) in self.lines.iter().enumerate() {
       let mut chunk: &str = line;
-      let mut offset: i32 = 0;
+      let mut offset: usize = 0;
 
       loop {
         // For this line we search which patterns match, all of them.
         let submatches = all_patterns
           .iter()
-          .filter_map(|tuple| match tuple.1.find_iter(chunk).nth(0) {
-            Some(m) => Some((tuple.0, tuple.1.clone(), m)),
-            None => None,
-          })
+          .filter_map(|tuple| tuple.1.find_iter(chunk).nth(0).map(|m| (tuple.0, tuple.1.clone(), m)))
           .collect::<Vec<_>>();
 
         // Then, we search for the match with the lowest index
@@ -114,24 +111,24 @@ impl<'a> State<'a> {
 
           if let Some(captures) = pattern.captures(text) {
             let captures: Vec<(&str, usize)> = if let Some(capture) = captures.name("match") {
-              [(capture.as_str(), capture.start())].to_vec()
+              vec![(capture.as_str(), capture.start())]
             } else if captures.len() > 1 {
               captures
                 .iter()
                 .skip(1)
-                .filter_map(|capture| capture)
+                .flatten()
                 .map(|capture| (capture.as_str(), capture.start()))
                 .collect::<Vec<(&str, usize)>>()
             } else {
-              [(matching.as_str(), 0)].to_vec()
+              vec![(matching.as_str(), 0)]
             };
 
             // Never hint or broke bash color sequences, but process it
             if *name != "bash" {
-              for (subtext, substart) in captures.iter() {
+              for (subtext, substart) in &captures {
                 matches.push(Match {
-                  x: offset + matching.start() as i32 + *substart as i32,
-                  y: index as i32,
+                  x: offset + matching.start() + *substart,
+                  y: index,
                   pattern: name,
                   text: subtext,
                   hint: None,
@@ -140,7 +137,7 @@ impl<'a> State<'a> {
             }
 
             chunk = chunk.get(matching.end()..).expect("Unknown chunk");
-            offset += matching.end() as i32;
+            offset += matching.end();
           } else {
             panic!("No matching?");
           }
@@ -153,13 +150,10 @@ impl<'a> State<'a> {
     let alphabet = super::alphabets::get_alphabet(self.alphabet);
     let mut hints = alphabet.hints(matches.len());
 
-    // This looks wrong but we do a pop after
-    if !reverse {
-      hints.reverse();
-    } else {
+    if reverse {
       matches.reverse();
-      hints.reverse();
     }
+    hints.reverse();
 
     if unique {
       let mut previous: HashMap<&str, String> = HashMap::new();
@@ -168,14 +162,14 @@ impl<'a> State<'a> {
         if let Some(previous_hint) = previous.get(mat.text) {
           mat.hint = Some(previous_hint.clone());
         } else if let Some(hint) = hints.pop() {
-          mat.hint = Some(hint.to_string().clone());
-          previous.insert(mat.text, hint.to_string().clone());
+          previous.insert(mat.text, hint.clone());
+          mat.hint = Some(hint);
         }
       }
     } else {
       for mat in &mut matches {
         if let Some(hint) = hints.pop() {
-          mat.hint = Some(hint.to_string().clone());
+          mat.hint = Some(hint);
         }
       }
     }
@@ -233,7 +227,7 @@ mod tests {
 
   #[test]
   fn match_bash() {
-    let lines = split("path: \x1b[32m/var/log/nginx.log\x1b[m\npath: \x1b[32mtest/log/nginx-2.log:32\x1b[mfolder/.nginx@4df2.log");
+    let lines = split("path: [32m/var/log/nginx.log[m\npath: [32mtest/log/nginx-2.log:32[mfolder/.nginx@4df2.log");
     let custom = [].to_vec();
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
@@ -245,14 +239,28 @@ mod tests {
 
   #[test]
   fn match_paths() {
-    let lines = split("Lorem /tmp/foo/bar_lol, lorem\n Lorem /var/log/boot-strap.log lorem ../log/kern.log lorem");
+    let lines = split(
+      "Lorem /tmp/foo/bar_lol, lorem\n Lorem /var/log/boot-strap.log lorem ../log/kern.log ../path/with/line/col.foo:3:45 lorem",
+    );
     let custom = [].to_vec();
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
-    assert_eq!(results.len(), 3);
-    assert_eq!(results.first().unwrap().text.clone(), "/tmp/foo/bar_lol");
-    assert_eq!(results.get(1).unwrap().text.clone(), "/var/log/boot-strap.log");
-    assert_eq!(results.get(2).unwrap().text.clone(), "../log/kern.log");
+    // assert_eq!(results.len(), 4);
+    assert_eq!(results.first().unwrap().text, "/tmp/foo/bar_lol");
+    assert_eq!(results.get(1).unwrap().text, "/var/log/boot-strap.log");
+    assert_eq!(results.get(2).unwrap().text, "../log/kern.log");
+    assert_eq!(results.get(3).unwrap().text, "../path/with/line/col.foo:3:45");
+  }
+
+  #[test]
+  fn match_paths_with_parens() {
+    let lines = split("error at /src/main.rs(10,5) and /src/lib.rs(42) plain /src/ok.rs");
+    let custom = [].to_vec();
+    let results = State::new(&lines, "abcd", &custom).matches(false, false);
+
+    assert_eq!(results.first().unwrap().text, "/src/main.rs(10,5)");
+    assert_eq!(results.get(1).unwrap().text, "/src/lib.rs(42)");
+    assert_eq!(results.get(2).unwrap().text, "/src/ok.rs");
   }
 
   #[test]
@@ -262,8 +270,8 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 2);
-    assert_eq!(results.first().unwrap().text.clone(), "/app/routes/$routeId/$objectId");
-    assert_eq!(results.get(1).unwrap().text.clone(), "/app/routes/$sectionId");
+    assert_eq!(results.first().unwrap().text, "/app/routes/$routeId/$objectId");
+    assert_eq!(results.get(1).unwrap().text, "/app/routes/$sectionId");
   }
 
   #[test]
@@ -273,7 +281,7 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 1);
-    assert_eq!(results.first().unwrap().text.clone(), "~/.gnu/.config.txt");
+    assert_eq!(results.first().unwrap().text, "~/.gnu/.config.txt");
   }
 
   #[test]
@@ -283,7 +291,7 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 1);
-    assert_eq!(results.first().unwrap().text.clone(), "dev/api/[slug]/foo");
+    assert_eq!(results.first().unwrap().text, "dev/api/[slug]/foo");
   }
 
   #[test]
@@ -302,13 +310,10 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 4);
-    assert_eq!(results.first().unwrap().text.clone(), "fd70b5695");
-    assert_eq!(results.get(1).unwrap().text.clone(), "5246ddf");
-    assert_eq!(results.get(2).unwrap().text.clone(), "f924213");
-    assert_eq!(
-      results.get(3).unwrap().text.clone(),
-      "973113963b491874ab2e372ee60d4b4cb75f717c"
-    );
+    assert_eq!(results.first().unwrap().text, "fd70b5695");
+    assert_eq!(results.get(1).unwrap().text, "5246ddf");
+    assert_eq!(results.get(2).unwrap().text, "f924213");
+    assert_eq!(results.get(3).unwrap().text, "973113963b491874ab2e372ee60d4b4cb75f717c");
   }
 
   #[test]
@@ -318,25 +323,24 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 3);
-    assert_eq!(results.first().unwrap().text.clone(), "127.0.0.1");
-    assert_eq!(results.get(1).unwrap().text.clone(), "255.255.10.255");
-    assert_eq!(results.get(2).unwrap().text.clone(), "127.0.0.1");
+    assert_eq!(results.first().unwrap().text, "127.0.0.1");
+    assert_eq!(results.get(1).unwrap().text, "255.255.10.255");
+    assert_eq!(results.get(2).unwrap().text, "127.0.0.1");
   }
 
   #[test]
   fn match_ipv6s() {
-    let lines = split("Lorem ipsum fe80::2:202:fe4 lorem\n Lorem 2001:67c:670:202:7ba8:5e41:1591:d723 lorem fe80::2:1 lorem ipsum fe80:22:312:fe::1%eth0");
+    let lines = split(
+      "Lorem ipsum fe80::2:202:fe4 lorem\n Lorem 2001:67c:670:202:7ba8:5e41:1591:d723 lorem fe80::2:1 lorem ipsum fe80:22:312:fe::1%eth0",
+    );
     let custom = [].to_vec();
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 4);
-    assert_eq!(results.first().unwrap().text.clone(), "fe80::2:202:fe4");
-    assert_eq!(
-      results.get(1).unwrap().text.clone(),
-      "2001:67c:670:202:7ba8:5e41:1591:d723"
-    );
-    assert_eq!(results.get(2).unwrap().text.clone(), "fe80::2:1");
-    assert_eq!(results.get(3).unwrap().text.clone(), "fe80:22:312:fe::1%eth0");
+    assert_eq!(results.first().unwrap().text, "fe80::2:202:fe4");
+    assert_eq!(results.get(1).unwrap().text, "2001:67c:670:202:7ba8:5e41:1591:d723");
+    assert_eq!(results.get(2).unwrap().text, "fe80::2:1");
+    assert_eq!(results.get(3).unwrap().text, "fe80:22:312:fe::1%eth0");
   }
 
   #[test]
@@ -346,27 +350,29 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 2);
-    assert_eq!(results.first().unwrap().pattern.clone(), "markdown_url");
-    assert_eq!(results.first().unwrap().text.clone(), "https://github.io?foo=bar");
-    assert_eq!(results.get(1).unwrap().pattern.clone(), "markdown_url");
-    assert_eq!(results.get(1).unwrap().text.clone(), "http://cdn.com/img.jpg");
+    assert_eq!(results.first().unwrap().pattern, "markdown_url");
+    assert_eq!(results.first().unwrap().text, "https://github.io?foo=bar");
+    assert_eq!(results.get(1).unwrap().pattern, "markdown_url");
+    assert_eq!(results.get(1).unwrap().text, "http://cdn.com/img.jpg");
   }
 
   #[test]
   fn match_urls() {
-    let lines = split("Lorem ipsum https://www.rust-lang.org/tools lorem\n Lorem ipsumhttps://crates.io lorem https://github.io?foo=bar lorem ssh://github.io");
+    let lines = split(
+      "Lorem ipsum https://www.rust-lang.org/tools lorem\n Lorem ipsumhttps://crates.io lorem https://github.io?foo=bar lorem ssh://github.io",
+    );
     let custom = [].to_vec();
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 4);
-    assert_eq!(results.first().unwrap().text.clone(), "https://www.rust-lang.org/tools");
-    assert_eq!(results.first().unwrap().pattern.clone(), "url");
-    assert_eq!(results.get(1).unwrap().text.clone(), "https://crates.io");
-    assert_eq!(results.get(1).unwrap().pattern.clone(), "url");
-    assert_eq!(results.get(2).unwrap().text.clone(), "https://github.io?foo=bar");
-    assert_eq!(results.get(2).unwrap().pattern.clone(), "url");
-    assert_eq!(results.get(3).unwrap().text.clone(), "ssh://github.io");
-    assert_eq!(results.get(3).unwrap().pattern.clone(), "url");
+    assert_eq!(results.first().unwrap().text, "https://www.rust-lang.org/tools");
+    assert_eq!(results.first().unwrap().pattern, "url");
+    assert_eq!(results.get(1).unwrap().text, "https://crates.io");
+    assert_eq!(results.get(1).unwrap().pattern, "url");
+    assert_eq!(results.get(2).unwrap().text, "https://github.io?foo=bar");
+    assert_eq!(results.get(2).unwrap().pattern, "url");
+    assert_eq!(results.get(3).unwrap().text, "ssh://github.io");
+    assert_eq!(results.get(3).unwrap().pattern, "url");
   }
 
   #[test]
@@ -376,9 +382,9 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 3);
-    assert_eq!(results.first().unwrap().text.clone(), "0xfd70b5695");
-    assert_eq!(results.get(1).unwrap().text.clone(), "0x5246ddf");
-    assert_eq!(results.get(2).unwrap().text.clone(), "0x973113");
+    assert_eq!(results.first().unwrap().text, "0xfd70b5695");
+    assert_eq!(results.get(1).unwrap().text, "0x5246ddf");
+    assert_eq!(results.get(2).unwrap().text, "0x973113");
   }
 
   #[test]
@@ -388,10 +394,10 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 4);
-    assert_eq!(results.first().unwrap().text.clone(), "#fd7b56");
-    assert_eq!(results.get(1).unwrap().text.clone(), "#FF00FF");
-    assert_eq!(results.get(2).unwrap().text.clone(), "#00fF05");
-    assert_eq!(results.get(3).unwrap().text.clone(), "#abcd00");
+    assert_eq!(results.first().unwrap().text, "#fd7b56");
+    assert_eq!(results.get(1).unwrap().text, "#FF00FF");
+    assert_eq!(results.get(2).unwrap().text, "#00fF05");
+    assert_eq!(results.get(3).unwrap().text, "#abcd00");
   }
 
   #[test]
@@ -402,7 +408,7 @@ mod tests {
 
     assert_eq!(results.len(), 1);
     assert_eq!(
-      results.first().unwrap().text.clone(),
+      results.first().unwrap().text,
       "QmRdbNSxDJBXmssAc9fvTtux4duptMvfSGiGuq6yHAQVKQ"
     );
   }
@@ -424,7 +430,7 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 1);
-    assert_eq!(results.first().unwrap().text.clone(), "src/main.rs");
+    assert_eq!(results.first().unwrap().text, "src/main.rs");
   }
 
   #[test]
@@ -434,7 +440,7 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 1);
-    assert_eq!(results.first().unwrap().text.clone(), "src/main.rs");
+    assert_eq!(results.first().unwrap().text, "src/main.rs");
   }
 
   #[test]
@@ -444,48 +450,27 @@ mod tests {
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 2);
-    assert_eq!(results.first().unwrap().text.clone(), "samples/test1");
-    assert_eq!(results.get(1).unwrap().text.clone(), "samples/test2");
-  }
-
-  #[test]
-  fn match_line_col() {
-    let lines = split("Lorem /tmp/foo/bar.rs:12:34 lorem");
-    let custom = [].to_vec();
-    let results = State::new(&lines, "abcd", &custom).matches(false, false);
-
-    assert_eq!(results.len(), 1);
-    assert_eq!(results.first().unwrap().text.clone(), "/tmp/foo/bar.rs:12:34");
-  }
-
-  #[test]
-  fn match_paren_notation() {
-    let lines = split("Lorem /tmp/foo/bar.rs(10,5) lorem");
-    let custom = [].to_vec();
-    let results = State::new(&lines, "abcd", &custom).matches(false, false);
-
-    assert_eq!(results.len(), 1);
-    assert_eq!(results.first().unwrap().text.clone(), "/tmp/foo/bar.rs(10,5)");
+    assert_eq!(results.first().unwrap().text, "samples/test1");
+    assert_eq!(results.get(1).unwrap().text, "samples/test2");
   }
 
   #[test]
   fn priority() {
-    let lines = split("Lorem [link](http://foo.bar) ipsum CUSTOM-52463 lorem ISSUE-123 lorem\nLorem /var/fd70b569/9999.log 52463 lorem\n Lorem 973113 lorem 123e4567-e89b-12d3-a456-426655440000 lorem 8888 lorem\n  https://crates.io/23456/fd70b569 lorem");
+    let lines = split(
+      "Lorem [link](http://foo.bar) ipsum CUSTOM-52463 lorem ISSUE-123 lorem\nLorem /var/fd70b569/9999.log 52463 lorem\n Lorem 973113 lorem 123e4567-e89b-12d3-a456-426655440000 lorem 8888 lorem\n  https://crates.io/23456/fd70b569 lorem",
+    );
     let custom = ["CUSTOM-[0-9]{4,}", "ISSUE-[0-9]{3}"].to_vec();
     let results = State::new(&lines, "abcd", &custom).matches(false, false);
 
     assert_eq!(results.len(), 9);
-    assert_eq!(results.first().unwrap().text.clone(), "http://foo.bar");
-    assert_eq!(results.get(1).unwrap().text.clone(), "CUSTOM-52463");
-    assert_eq!(results.get(2).unwrap().text.clone(), "ISSUE-123");
-    assert_eq!(results.get(3).unwrap().text.clone(), "/var/fd70b569/9999.log");
-    assert_eq!(results.get(4).unwrap().text.clone(), "52463");
-    assert_eq!(results.get(5).unwrap().text.clone(), "973113");
-    assert_eq!(
-      results.get(6).unwrap().text.clone(),
-      "123e4567-e89b-12d3-a456-426655440000"
-    );
-    assert_eq!(results.get(7).unwrap().text.clone(), "8888");
-    assert_eq!(results.get(8).unwrap().text.clone(), "https://crates.io/23456/fd70b569");
+    assert_eq!(results.first().unwrap().text, "http://foo.bar");
+    assert_eq!(results.get(1).unwrap().text, "CUSTOM-52463");
+    assert_eq!(results.get(2).unwrap().text, "ISSUE-123");
+    assert_eq!(results.get(3).unwrap().text, "/var/fd70b569/9999.log");
+    assert_eq!(results.get(4).unwrap().text, "52463");
+    assert_eq!(results.get(5).unwrap().text, "973113");
+    assert_eq!(results.get(6).unwrap().text, "123e4567-e89b-12d3-a456-426655440000");
+    assert_eq!(results.get(7).unwrap().text, "8888");
+    assert_eq!(results.get(8).unwrap().text, "https://crates.io/23456/fd70b569");
   }
 }

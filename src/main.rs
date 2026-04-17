@@ -154,6 +154,7 @@ fn main() {
   let mut output = String::new();
 
   handle.read_to_string(&mut output).unwrap();
+  drop(handle);
 
   let lines = output.split('\n').collect::<Vec<&str>>();
 
@@ -175,34 +176,34 @@ fn main() {
     viewbox.present()
   };
 
-  if !selected.is_empty() {
-    let output = selected
-      .iter()
-      .map(|(text, upcase)| {
-        let upcase_value = if *upcase { "true" } else { "false" };
+  if selected.is_empty() {
+    std::process::exit(1);
+  }
 
-        let mut output = format.to_string();
+  let output = selected
+    .iter()
+    .map(|(text, upcase)| {
+      let upcase_value = if *upcase { "true" } else { "false" };
 
-        output = str::replace(&output, "%U", upcase_value);
-        output = str::replace(&output, "%H", text.as_str());
-        output
-      })
-      .collect::<Vec<_>>()
-      .join("\n");
+      let mut output = format.to_string();
 
-    if let Some(target) = target {
-      let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(target)
-        .expect("Unable to open the target file");
+      output = str::replace(&output, "%U", upcase_value);
+      output = str::replace(&output, "%H", text.as_str());
+      output
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
 
-      file.write(output.as_bytes()).unwrap();
-    } else {
-      print!("{}", output);
-    }
+  if let Some(target) = target {
+    let mut file = OpenOptions::new()
+      .create(true)
+      .truncate(true)
+      .write(true)
+      .open(target)
+      .expect("Unable to open the target file");
+
+    file.write_all(output.as_bytes()).unwrap();
   } else {
-    ::std::process::exit(1);
+    print!("{output}");
   }
 }
