@@ -153,7 +153,7 @@ fn main() {
   let mut handle = stdin.lock();
   let mut output = String::new();
 
-  handle.read_to_string(&mut output).unwrap();
+  handle.read_to_string(&mut output).expect("Failed to read from stdin");
   drop(handle);
 
   let lines = output.split('\n').collect::<Vec<&str>>();
@@ -202,7 +202,7 @@ fn main() {
       .open(target)
       .expect("Unable to open the target file");
 
-    file.write_all(output.as_bytes()).unwrap();
+    file.write_all(output.as_bytes()).expect("Failed to write to target file");
   } else {
     print!("{output}");
   }

@@ -76,7 +76,7 @@ impl<'a> View<'a> {
   }
 
   fn render(&self, stdout: &mut dyn Write, typed_hint: &str) -> std::io::Result<()> {
-    let (columns, rows) = terminal_size_fd(self.tty.as_ref().unwrap())?;
+    let (columns, rows) = terminal_size_fd(self.tty.as_ref().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "no tty"))?)?;
     write!(stdout, "{}", cursor::Hide)?;
     let mut line_row: u16 = 0;
     let mut line_rows = Vec::new();
