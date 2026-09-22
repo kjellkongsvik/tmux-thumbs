@@ -1,18 +1,19 @@
-# tmux-thumbs
+# thumbs
 
-[![Build Status](https://github.com/fcsonline/tmux-thumbs/workflows/Rust/badge.svg)](https://github.com/fcsonline/tmux-thumbs/actions)
-[![dependency status](https://deps.rs/repo/github/fcsonline/tmux-thumbs/status.svg)](https://deps.rs/repo/github/fcsonline/tmux-thumbs)
-[![Coverage Status](https://coveralls.io/repos/github/fcsonline/tmux-thumbs/badge.svg?branch=master)](https://coveralls.io/github/fcsonline/tmux-thumbs?branch=master)
-[![Maintenance](https://img.shields.io/badge/maintenance-actively%20maintained-brightgreen.svg)](https://deps.rs/repo/github/fcsonline/tmux-thumbs)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-A lightning fast version of [tmux-fingers](https://github.com/Morantron/tmux-fingers) written in [Rust](https://www.rust-lang.org/) for copy pasting with vimium/vimperator like hints.
+A pure standalone version of [tmux-thumbs](https://github.com/fcsonline/tmux-thumbs)
+
+This readme is not up to date yet
 
 ## Usage
 
-Press ( <kbd>prefix</kbd> + <kbd>Space</kbd> ) to highlight in you current tmux
-visible pane all text that match specific patterns. Then press the highlighted
-letter hint to yank the text in your tmux buffer.
+If you want to enjoy terminal hints, you can do things like this without `tmux`:
+
+```
+> git log | thumbs
+> zellij ac dump-screen | thumbs
+```
 
 ### Matched patterns
 
@@ -33,54 +34,9 @@ These are the list of matched patterns that will be highlighted by default. If
 you want to highlight a pattern that is not in this list you can add one or
 more with `--regexp` parameter.
 
-## Demo
+## Deprecated tmux Configuration, kept for now
 
-[![demo](https://asciinema.org/a/232775.png?ts=1)](https://asciinema.org/a/232775?autoplay=1)
-
-## Using Tmux Plugin Manager
-
-You can add this line to your list of [TPM](https://github.com/tmux-plugins/tpm) plugins in `.tmux.conf`:
-
-```
-set -g @plugin 'fcsonline/tmux-thumbs'
-
-run-shell ~/.tmux/plugins/tmux-thumbs/tmux-thumbs.tmux
-```
-
-To be able to install the plugin just hit <kbd>prefix</kbd> + <kbd>I</kbd>. You should now be able to use
-the plugin!
-
-## Installation checking out the source code
-
-`tmux-thumbs` is written in Rust. You will need `rustc` version 1.35.0 or higher. The
-recommended way to install Rust is from the official [download page](https://rustup.rs/).
-
-Clone the repo:
-
-```
-git clone https://github.com/fcsonline/tmux-thumbs ~/.tmux/plugins/tmux-thumbs
-```
-
-Compile it with [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html):
-
-```
-cd ~/.tmux/plugins/tmux-thumbs
-cargo build --release
-```
-
-Source it in your `.tmux.conf`:
-
-```
-run-shell ~/.tmux/plugins/tmux-thumbs/tmux-thumbs.tmux
-```
-
-Reload TMUX conf by running:
-
-```
-tmux source-file ~/.tmux.conf
-```
-
-## Configuration
+TODO: Move into help
 
 If you want to customize how is shown your tmux-thumbs hints those all available
 parameters to set your perfect profile.
@@ -107,36 +63,7 @@ NOTE: for changes to take effect, you'll need to source again your `.tmux.conf` 
 * [@thumbs-contrast](#thumbs-contrast)
 * [@thumbs-osc52](#thumbs-osc52)
 
-### @thumbs-key
 
-`default: space`
-
-Choose which key is used to enter in thumbs mode.
-
-For example:
-
-```
-set -g @thumbs-key F
-```
-
-If you want to customize the way how `tmux-thumbs` is triggered, you can always
-bind whatever key to `thumbs-pick` command. For example:
-
-```
-bind-key \; thumbs-pick
-```
-
-### @thumbs-alphabet
-
-`default: qwerty`
-
-Choose which set of characters is used to build hints. Review all [available alphabets](#Alphabets)
-
-For example:
-
-```
-set -g @thumbs-alphabet dvorak-homerow
-```
 
 ### @thumbs-reverse
 
@@ -401,136 +328,15 @@ output all of them.
 
 If you run standalone `thumbs` with multi selection mode (-m) you will be able to choose multiple hints pressing the desired letter and <kbd>Space</kbd> to finalize the selection.
 
-## Tmux compatibility
-
-This is the known list of versions of `tmux` compatible with `tmux-thumbs`:
-
-| Version | Compatible |
-|:-------:|:----------:|
-|   3.0a  |     ✅     |
-|   2.9a  |     ✅     |
-|   2.8   |      ❓    |
-|   2.7   |      ❓    |
-|   2.6   |     ✅     |
-|   2.5   |      ❓    |
-|   2.4   |      ❓    |
-|   2.3   |      ❓    |
-|   1.8   |      ❓    |
-|   1.7   |      ❓    |
-
-If you can check hat `tmux-thumbs` is or is not compatible with some specific version of `tmux`, let me know.
-
-## Standalone `thumbs`
-
-This project started as a `tmux` plugin but after reviewing it with some
-friends we decided to explore all the possibilities of decoupling thumbs from
-`tmux`. You can install it with a simple command:
-
-```
-cargo install thumbs
-```
-
-And those are all available options:
-
-```
-thumbs 0.7.1
-A lightning fast version copy/pasting like vimium/vimperator
-
-USAGE:
-    thumbs [FLAGS] [OPTIONS]
-
-FLAGS:
-    -c, --contrast    Put square brackets around hint for visibility
-    -h, --help        Prints help information
-    -m, --multi       Enable multi-selection
-    -r, --reverse     Reverse the order for assigned hints
-    -u, --unique      Don't show duplicated hints for the same match
-    -V, --version     Prints version information
-
-OPTIONS:
-    -a, --alphabet <alphabet>                          Sets the alphabet [default: qwerty]
-        --bg-color <background_color>                  Sets the background color for matches [default: black]
-        --fg-color <foreground_color>                  Sets the foregroud color for matches [default: green]
-    -f, --format <format>
-            Specifies the out format for the picked hint. (%U: Upcase, %H: Hint) [default: %H]
-
-        --hint-bg-color <hint_background_color>        Sets the background color for hints [default: black]
-        --hint-fg-color <hint_foreground_color>        Sets the foregroud color for hints [default: yellow]
-    -p, --position <position>                          Hint position [default: left]
-    -x, --regexp <regexp>...                           Use this regexp as extra pattern to match
-        --select-bg-color <select_background_color>    Sets the background color for selection [default: black]
-        --select-fg-color <select_foreground_color>    Sets the foreground color for selection [default: blue]
-        --multi-bg-color <multi_background_color>      Sets the background color for a multi selected item [default: black]
-        --multi-fg-color <multi_foreground_color>      Sets the foreground color for a multi selected item [default: cyan]
-    -t, --target <target>                              Stores the hint in the specified path
-```
-
-
-If you want to enjoy terminal hints, you can do things like this without `tmux`:
-
-```
-> alias pick='thumbs -u -r | xsel --clipboard -i'
-> git log | pick
-```
-
-Or multi selection:
-
 ```
 > git log | thumbs -m
 1df9fa69c8831ac042c6466af81e65402ee2a007
 4897dc4ecbd2ac90b17de95e00e9e75bb540e37f
 ```
 
-Standalone `thumbs` has some similarities to [FZF](https://github.com/junegunn/fzf).
-
 ## Background
 
-As I said, this project is based in [tmux-fingers](https://github.com/Morantron/tmux-fingers). Morantron did an extraordinary job, building all necessary pieces in Bash to achieve the text picker behaviour. He only deserves my gratitude for all the time I have been using [tmux-fingers](https://github.com/Morantron/tmux-fingers).
-
-During a [Fosdem](https://fosdem.org/) conf, we had the idea to rewrite it to another language. He had these thoughts many times ago but it was hard to start from scratch. So, we decided to start playing with Node.js and [react-blessed](https://github.com/Yomguithereal/react-blessed), but we detected some unacceptable latency when the program booted. We didn't investigate much about this latency.
-
-During those days another alternative appeared, called [tmux-picker](https://github.com/RTBHOUSE/tmux-picker), implemented in python and reusing many parts from [tmux-fingers](https://github.com/Morantron/tmux-fingers). It was nice, because it was fast and added original terminal color support.
-
-I was curious to know if this was possible to be written in [Rust](https://www.rust-lang.org/), and soon I realized that was something doable. The ability to implement tests for all critic parts of the application give you a great confidence about it. On the other hand, Rust has an awesome community that lets you achieve this kind of project in a short period of time.
-
-## Roadmap
-
-- [X] Support multi selection
-- [X] Decouple `tmux-thumbs` from `tmux`
-- [ ] Code [Kitty](https://github.com/kovidgoyal/kitty) plugin, now that `thumbs` can run standalone
-
-## Troubleshooting
-
-`tmux-thumbs` must work lighting fast. If you are facing a slow performance capturing the screen hints try to configure Tmux with these settings:
-
-```
-set -g visual-activity off
-set -g visual-bell off
-set -g visual-silence on
-```
-
-You can read a bit more about this issue here: https://github.com/fcsonline/tmux-thumbs/issues/88
-
-Every time I use `tmux-thumbs`, dead panes are created. Just review if you have
-this setting on:
-
-```
-set -g remain-on-exit on
-```
-
-You can read a bit more about this issue here: https://github.com/fcsonline/tmux-thumbs/issues/84
-
-## Donations
-
-If you appreciate all the job done in this project, a small donation is always welcome:
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/fcsonline)
-
-## Contribute
-
-This project started as a side project to learn Rust, so I'm sure that is full
-of mistakes and areas to be improve. If you think you can tweak the code to
-make it better, I'll really appreciate a pull request. ;)
+When I swithced from tmux to zellij I really missed tmux-fingers.
 
 # License
 
