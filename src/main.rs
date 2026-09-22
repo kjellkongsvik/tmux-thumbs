@@ -138,20 +138,23 @@ fn main() {
     .get_many::<String>("regexp")
     .map_or_else(Vec::new, |items| items.map(String::as_str).collect());
 
-  let foreground_color = colors::parse_color(args.get_one::<String>("foreground_color").unwrap());
-  let background_color = colors::parse_color(args.get_one::<String>("background_color").unwrap());
-  let hint_foreground_color = colors::parse_color(args.get_one::<String>("hint_foreground_color").unwrap());
-  let hint_background_color = colors::parse_color(args.get_one::<String>("hint_background_color").unwrap());
-  let select_foreground_color = colors::parse_color(args.get_one::<String>("select_foreground_color").unwrap());
-  let select_background_color = colors::parse_color(args.get_one::<String>("select_background_color").unwrap());
-  let multi_foreground_color = colors::parse_color(args.get_one::<String>("multi_foreground_color").unwrap());
-  let multi_background_color = colors::parse_color(args.get_one::<String>("multi_background_color").unwrap());
+  let colors = colors::Colors {
+    foreground: colors::parse_color(args.get_one::<String>("foreground_color").unwrap()),
+    background: colors::parse_color(args.get_one::<String>("background_color").unwrap()),
+    hint_foreground: colors::parse_color(args.get_one::<String>("hint_foreground_color").unwrap()),
+    hint_background: colors::parse_color(args.get_one::<String>("hint_background_color").unwrap()),
+    select_foreground: colors::parse_color(args.get_one::<String>("select_foreground_color").unwrap()),
+    select_background: colors::parse_color(args.get_one::<String>("select_background_color").unwrap()),
+    multi_foreground: colors::parse_color(args.get_one::<String>("multi_foreground_color").unwrap()),
+    multi_background: colors::parse_color(args.get_one::<String>("multi_background_color").unwrap()),
+  };
 
   let stdin = io::stdin();
   let mut handle = stdin.lock();
   let mut output = String::new();
 
-  handle.read_to_string(&mut output).unwrap();
+  handle.read_to_string(&mut output).expect("Failed to read from stdin");
+  drop(handle);
 
   let lines = output.split('\n').collect::<Vec<&str>>();
 
@@ -160,52 +163,49 @@ fn main() {
   let selected = {
     let mut viewbox = view::View::new(
       &mut state,
-      multi,
-      reverse,
-      unique,
-      contrast,
-      position,
-      select_foreground_color,
-      select_background_color,
-      multi_foreground_color,
-      multi_background_color,
-      foreground_color,
-      background_color,
-      hint_foreground_color,
-      hint_background_color,
+      view::ViewOptions {
+        multi,
+        reverse,
+        unique,
+        contrast,
+        position,
+        colors,
+      },
     );
 
     viewbox.present()
   };
 
-  if !selected.is_empty() {
-    let output = selected
-      .iter()
-      .map(|(text, upcase)| {
-        let upcase_value = if *upcase { "true" } else { "false" };
+  if selected.is_empty() {
+    std::process::exit(1);
+  }
 
-        let mut output = format.to_string();
+  let output = selected
+    .iter()
+    .map(|(text, upcase)| {
+      let upcase_value = if *upcase { "true" } else { "false" };
 
-        output = str::replace(&output, "%U", upcase_value);
-        output = str::replace(&output, "%H", text.as_str());
-        output
-      })
-      .collect::<Vec<_>>()
-      .join("\n");
+      let mut output = format.to_string();
 
-    if let Some(target) = target {
-      let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(target)
-        .expect("Unable to open the target file");
+      output = str::replace(&output, "%U", upcase_value);
+      output = str::replace(&output, "%H", text.as_str());
+      output
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
 
-      file.write(output.as_bytes()).unwrap();
-    } else {
-      print!("{}", output);
-    }
+  if let Some(target) = target {
+    let mut file = OpenOptions::new()
+      .create(true)
+      .truncate(true)
+      .write(true)
+      .open(target)
+      .expect("Unable to open the target file");
+
+    file
+      .write_all(output.as_bytes())
+      .expect("Failed to write to target file");
   } else {
-    ::std::process::exit(1);
+    print!("{output}");
   }
 }
