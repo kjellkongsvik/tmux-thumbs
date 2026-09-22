@@ -1,7 +1,7 @@
 [package]
 name = "thumbs"
 version = "0.9.0"
-authors = ["Ferran Basora <fcsonline@gmail.com>"]
+authors = ["Kjell W. Kongsvik <kjell.kongsvik@gmail.com>"]
 edition = "2024"
 description = "A lightning fast version copy/pasting like vimium/vimperator"
 repository = "https://github.com/fcsonline/tmux-thumbs"
