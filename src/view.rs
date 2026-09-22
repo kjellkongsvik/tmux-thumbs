@@ -1,5 +1,6 @@
 use super::state;
 use crate::colors::Colors;
+use std::fs::File;
 use std::io::{Read, Write};
 use termion::async_stdin;
 use termion::event::Key;
@@ -28,6 +29,7 @@ pub struct View<'a> {
   matches: Vec<state::Match<'a>>,
   colors: Colors,
   chosen: Vec<(String, bool)>,
+  tty: Option<File>,
 }
 
 enum CaptureEvent {
@@ -49,6 +51,7 @@ impl<'a> View<'a> {
       matches,
       colors: opts.colors,
       chosen: vec![],
+      tty: None,
     }
   }
 
@@ -72,9 +75,14 @@ impl<'a> View<'a> {
     }
   }
 
-  fn render(&self, stdout: &mut dyn Write, typed_hint: &str) {
-    let (columns, rows) = terminal_size_fd(&get_tty().unwrap()).unwrap();
-    write!(stdout, "{}", cursor::Hide).unwrap();
+  fn render(&self, stdout: &mut dyn Write, typed_hint: &str) -> std::io::Result<()> {
+    let (columns, rows) = terminal_size_fd(
+      self
+        .tty
+        .as_ref()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "no tty"))?,
+    )?;
+    write!(stdout, "{}", cursor::Hide)?;
     let mut line_row: u16 = 0;
     let mut line_rows = Vec::new();
 
@@ -102,8 +110,7 @@ impl<'a> View<'a> {
           "{goto}{text}",
           goto = cursor::Goto(1, line_rows[index] - line_start + 1),
           text = line
-        )
-        .unwrap();
+        )?;
       }
     }
 
@@ -146,8 +153,7 @@ impl<'a> View<'a> {
         resetf = color::Fg(color::Reset),
         resetb = color::Bg(color::Reset),
         text = &text
-      )
-      .unwrap();
+      )?;
 
       if let Some(ref hint) = mat.hint {
         let extra_position = match self.position {
@@ -169,8 +175,7 @@ impl<'a> View<'a> {
           resetf = color::Fg(color::Reset),
           resetb = color::Bg(color::Reset),
           text = &text
-        )
-        .unwrap();
+        )?;
 
         if hint.starts_with(typed_hint) {
           write!(
@@ -182,13 +187,13 @@ impl<'a> View<'a> {
             resetf = color::Fg(color::Reset),
             resetb = color::Bg(color::Reset),
             text = &typed_hint
-          )
-          .unwrap();
+          )?;
         }
       }
     }
 
-    stdout.flush().unwrap();
+    stdout.flush()?;
+    Ok(())
   }
 
   fn listen(&mut self, stdin: &mut dyn Read, stdout: &mut dyn Write) -> CaptureEvent {
@@ -204,7 +209,9 @@ impl<'a> View<'a> {
       .max_by(|x, y| x.len().cmp(&y.len()))
       .unwrap();
 
-    self.render(stdout, &typed_hint);
+    if self.render(stdout, &typed_hint).is_err() {
+      return CaptureEvent::Exit;
+    }
 
     loop {
       if let Some(key) = stdin.keys().next() {
@@ -292,13 +299,20 @@ impl<'a> View<'a> {
         continue; // don't render again if nothing new to show
       }
 
-      self.render(stdout, &typed_hint);
+      if self.render(stdout, &typed_hint).is_err() {
+        break;
+      }
     }
 
     CaptureEvent::Exit
   }
 
   pub fn present(&mut self) -> Vec<(String, bool)> {
+    let tty = match get_tty() {
+      Ok(t) => t,
+      Err(_) => return vec![],
+    };
+    self.tty = Some(tty);
     let mut stdin = async_stdin();
     let mut stdout = match get_tty()
       .and_then(|t| t.into_raw_mode())
@@ -313,7 +327,7 @@ impl<'a> View<'a> {
       CaptureEvent::Hint => self.chosen.clone(),
     };
 
-    write!(stdout, "{}", cursor::Show).unwrap();
+    let _ = write!(stdout, "{}", cursor::Show);
 
     hints
   }
@@ -352,6 +366,7 @@ mod tests {
         multi_background: default,
       },
       chosen: vec![],
+      tty: None,
     };
 
     let result = view.make_hint_text("a");
