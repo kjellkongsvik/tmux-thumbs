@@ -1,11 +1,11 @@
 [package]
 name = "thumbs"
 version = "0.9.0"
-authors = ["Ferran Basora <fcsonline@gmail.com>"]
+authors = ["Kjell W. Kongsvik <kjellkongsvik@gmail.com>"]
 edition = "2024"
-description = "A lightning fast version copy/pasting like vimium/vimperator"
-repository = "https://github.com/fcsonline/tmux-thumbs"
-keywords = ["rust", "tmux", "tmux-plugin", "vimium", "vimperator"]
+description = "A tmux-thumbs fork without tmux"
+repository = "https://github.com/kjellkongsvik/thumbs"
+keywords = ["rust", "zellij", "tmux", "tmux-fingers", "vimium", "vimperator"]
 license = "MIT"
 
 [dependencies]
